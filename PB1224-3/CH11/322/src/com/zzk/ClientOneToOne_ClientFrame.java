@@ -1,0 +1,207 @@
+package com.zzk;
+
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.EventQueue;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+
+public class ClientOneToOne_ClientFrame extends JFrame {
+    private JTextField tf_newUser;
+    private JList user_list;
+    private JTextArea ta_info;
+    private JTextField tf_send;
+    PrintWriter out;// 宣告輸出流對像
+    private boolean loginFlag = false;// 為true時表示已經登入，為false時表示未登入
+    
+    /**
+     * Launch the application
+     * 
+     * @param args
+     */
+    public static void main(String args[]) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    ClientOneToOne_ClientFrame frame = new ClientOneToOne_ClientFrame();
+                    frame.setVisible(true);
+                    frame.createClientSocket();// 呼叫方法建立套接字對像
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+    
+    public void createClientSocket() {
+        try {
+            Socket socket = new Socket("localhost", 1978);// 建立套接字對像
+            out = new PrintWriter(socket.getOutputStream(), true);// 建立輸出流對像
+            new ClientThread(socket).start();// 建立並啟動線程對像
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    class ClientThread extends Thread {
+        Socket socket;
+        
+        public ClientThread(Socket socket) {
+            this.socket = socket;
+        }
+        
+        public void run() {
+            try {
+                BufferedReader in = new BufferedReader(new InputStreamReader(
+                        socket.getInputStream()));// 建立輸入流對像
+                DefaultComboBoxModel model = (DefaultComboBoxModel) user_list
+                                .getModel();// 獲得列表框的模型
+                while (true) {
+                    String info = in.readLine().trim();// 讀取資訊
+                    
+                    if (!info.startsWith("MSG:")) {
+                        boolean itemFlag = false;// 標記是否為列表框增加列記錄，為true不增加，為false增加
+                        for (int i = 0; i < model.getSize(); i++) {
+                            if (info.equals((String) model.getElementAt(i))) {
+                                itemFlag = true;
+                            }
+                        }
+                        if (!itemFlag) {
+                            model.addElement(info);// 增加列記錄
+                        } else {
+                            itemFlag = false;
+                        }
+                    } else {
+                        ta_info.append(info + "\n");// 在純文字域中顯示資訊
+                        if (info.equals("88")) {
+                            break;// 結束線程
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    
+    private void send() {
+        if (!loginFlag) {
+            JOptionPane.showMessageDialog(null, "請先登入。");
+            return;
+        }
+        String sendUserName = tf_newUser.getText().trim();
+        String info = tf_send.getText();// 獲得輸入的資訊
+        if (info.equals("")) {
+            return;// 如果沒輸入資訊則傳回，即不發送
+        }
+        String receiveUserName = (String) user_list.getSelectedValue();// 獲得接收資訊的使用者
+        String msg = sendUserName + "：發送給：" + receiveUserName + "：的資訊是： "
+                + info;// 定義發送的資訊
+        if (info.equals("88")) {
+            System.exit(0);// 如果沒輸入資訊是88，則退出
+        }
+        out.println(msg);// 發送資訊
+        out.flush();// 更新輸出緩衝區
+        tf_send.setText(null);// 清空純文字框
+    }
+    
+    /**
+     * Create the frame
+     */
+    public ClientOneToOne_ClientFrame() {
+        super();
+        setTitle("客戶端一對一通訊——客戶端程式");
+        setBounds(100, 100, 385, 288);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        
+        final JPanel panel = new JPanel();
+        getContentPane().add(panel, BorderLayout.SOUTH);
+        
+        final JLabel label = new JLabel();
+        label.setText("輸入聊天內容：");
+        panel.add(label);
+        
+        tf_send = new JTextField();
+        tf_send.addActionListener(new ActionListener() {
+            public void actionPerformed(final ActionEvent e) {
+                send();// 呼叫方法發送資訊
+            }
+        });
+        tf_send.setPreferredSize(new Dimension(180, 25));
+        panel.add(tf_send);
+        
+        final JButton button = new JButton();
+        button.addActionListener(new ActionListener() {
+            public void actionPerformed(final ActionEvent e) {
+                send();// 呼叫方法發送資訊
+            }
+        });
+        button.setText("發  送");
+        panel.add(button);
+        
+        final JSplitPane splitPane = new JSplitPane();
+        splitPane.setDividerLocation(100);
+        getContentPane().add(splitPane, BorderLayout.CENTER);
+        
+        final JScrollPane scrollPane = new JScrollPane();
+        splitPane.setRightComponent(scrollPane);
+        
+        ta_info = new JTextArea();
+        scrollPane.setViewportView(ta_info);
+        
+        final JScrollPane scrollPane_1 = new JScrollPane();
+        splitPane.setLeftComponent(scrollPane_1);
+        
+        user_list = new JList();
+        user_list.setModel(new DefaultComboBoxModel(new String[] { "" }));
+        scrollPane_1.setViewportView(user_list);
+        
+        final JPanel panel_1 = new JPanel();
+        getContentPane().add(panel_1, BorderLayout.NORTH);
+        
+        final JLabel label_1 = new JLabel();
+        label_1.setText("輸入使用者名稱稱：");
+        panel_1.add(label_1);
+        
+        tf_newUser = new JTextField();
+        tf_newUser.setPreferredSize(new Dimension(180, 25));
+        panel_1.add(tf_newUser);
+        
+        final JButton button_1 = new JButton();
+        button_1.addActionListener(new ActionListener() {
+            public void actionPerformed(final ActionEvent e) {
+                if (loginFlag) {
+                    JOptionPane.showMessageDialog(null, "在同一視窗只能登入一次。");
+                    return;
+                }
+                String userName = tf_newUser.getText().trim();// 獲得登入使用者名稱
+                out.println("使用者：" + userName);// 發送登入使用者的名稱
+                out.flush();// 更新輸出緩衝區
+                tf_newUser.setEnabled(false);
+                loginFlag = true;
+            }
+        });
+        button_1.setText("登  錄");
+        panel_1.add(button_1);
+    }
+}
+
